@@ -121,10 +121,19 @@ export async function deployGreetAccount(
     // Submit transaction that creates account
     await sendAndConfirmTransaction(connection, transaction, [payer]);
   } else {
+    let targetGreetedPubkey = greetedPubkey;
+    if (process.env.INCORRECT_KEY === "1") {
+      // Uses an incorrect seed to use an incorrect PDA address
+      targetGreetedPubkey = await PublicKey.createWithSeed(
+        payer.publicKey,
+        "DIFFERENT_SEED",
+        programId
+      );
+    }
     // Increment counter within already deployed greeting account
-    console.log("Writing to the greeting counter", greetedPubkey.toBase58());
+    console.log("Writing to the greeting counter", targetGreetedPubkey.toBase58());
     const instruction = new TransactionInstruction({
-      keys: [{ pubkey: greetedPubkey, isSigner: false, isWritable: true }],
+      keys: [{ pubkey: targetGreetedPubkey, isSigner: false, isWritable: true }],
       programId,
       data: Buffer.alloc(0), // All instructions are hellos
     });
