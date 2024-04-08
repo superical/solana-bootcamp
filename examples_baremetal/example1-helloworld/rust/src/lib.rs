@@ -11,7 +11,7 @@ pub fn process_instruction(
     _accounts: &[AccountInfo], // accounts to not interact with (this time)
     _instruction_data: &[u8], // Ignored, all helloworld instructions are hellos
 ) -> ProgramResult {
-    msg!("[lib] Hello World Rust program entrypoint");
+    msg!("[lib] Hello World Rust program entrypoint, program_id: {:?}", _program_id);
 
     Ok(())
 }
