@@ -249,6 +249,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytemuck"
+version = "1.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d6d68c57235a3a081186990eca2867354726650f42f7516ca50c28d6281fd15"
+
+[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -359,6 +365,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "compute"
+version = "0.0.1"
+dependencies = [
+ "borsh",
+ "borsh-derive",
+ "solana-program",
+ "solana-program-test",
+ "solana-sdk",
+]
+
+[[package]]
 name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -366,6 +383,17 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "counter"
+version = "0.0.1"
+dependencies = [
+ "borsh",
+ "borsh-derive",
+ "solana-program",
+ "solana-program-test",
+ "solana-sdk",
+]
+
+[[package]]
+name = "cpi"
 version = "0.0.1"
 dependencies = [
  "borsh",
@@ -1639,6 +1667,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3b8c0d71734018084da0c0354193a5edfb81b20d2d57a92c5b154aefc554a4a"
 dependencies = [
  "crypto-mac 0.10.1",
+]
+
+[[package]]
+name = "pda"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "bytemuck",
+ "solana-program",
 ]
 
 [[package]]
