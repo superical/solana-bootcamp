@@ -3,17 +3,18 @@ seeds = false
 
 [provider]
 cluster = "localnet"
-wallet = "~/.config/solana/id.json"
+#wallet = "~/.config/solana/id.json"
+wallet = "~/my-solana-wallet/my-keypair.json"
 
-## /target is excluded from being pushed so upon cloning and 
+## /target is excluded from being pushed so upon cloning and
 ## running anchor build and then anchor deploy
 ## newly created program addresses have to be pasted below
-## as well as into respective programs and then need to run 
+## as well as into respective programs and then need to run
 ## anchor build and then anchor deploy
 ## AGAIN
 
 [programs.localnet]
-example1 = "EnNAUhQEdDNtNszfguvK5RSkSLDStPLtUqeLpbjayoNq" 
+example1 = "EnNAUhQEdDNtNszfguvK5RSkSLDStPLtUqeLpbjayoNq"
 example2 = "5521eQoUE17iVGZXCwwGApaF6qExq2hkYVviETpfaXQE"
 example3 = "BG8eNGD8vvPpegz6NojiFS2n6yPHV5yt9LJngp1QCkFf"
 
