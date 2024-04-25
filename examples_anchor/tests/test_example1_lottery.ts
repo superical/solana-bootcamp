@@ -2,6 +2,7 @@ import assert from "assert";
 import { expect } from "chai";
 import * as anchor from "@project-serum/anchor";
 import { Example1 } from "../target/types/example1";
+
 const { SystemProgram } = anchor.web3;
 
 describe("Tests for example1-lottery", async () => {
@@ -26,26 +27,26 @@ describe("Tests for example1-lottery", async () => {
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(
         player1.publicKey,
-        2 * LAMPORTS_PER_SOL
-      )
+        2 * LAMPORTS_PER_SOL,
+      ),
     );
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(
         player2.publicKey,
-        2 * LAMPORTS_PER_SOL
-      )
+        2 * LAMPORTS_PER_SOL,
+      ),
     );
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(
         lottery_admin.publicKey,
-        2 * LAMPORTS_PER_SOL
-      )
+        2 * LAMPORTS_PER_SOL,
+      ),
     );
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(
         skintPlayer3.publicKey,
-        0.4 * LAMPORTS_PER_SOL
-      )
+        0.4 * LAMPORTS_PER_SOL,
+      ),
     );
   });
 
@@ -58,7 +59,8 @@ describe("Tests for example1-lottery", async () => {
         systemProgram: SystemProgram.programId,
       })
       .signers([lottery, lottery_admin])
-      .rpc();
+      .rpc()
+      .catch(e => console.log(e));
 
     let lotteryState = await program.account.lottery.fetch(lottery.publicKey);
 
@@ -67,7 +69,7 @@ describe("Tests for example1-lottery", async () => {
 
     // Assert authority matches lottery admin
     expect(lotteryState.authority.toString()).to.equal(
-      lottery_admin.publicKey.toString()
+      lottery_admin.publicKey.toString(),
     );
 
     // Assert ticket price has been set
@@ -77,10 +79,10 @@ describe("Tests for example1-lottery", async () => {
   it("Submits a bid as player1", async () => {
     // Get starting balances for player1 and lottery account
     let startBalancePlayer: number = await provider.connection.getBalance(
-      player1.publicKey
+      player1.publicKey,
     );
     let startBalanceLottery: number = await provider.connection.getBalance(
-      lottery.publicKey
+      lottery.publicKey,
     );
 
     // Get lottery index
@@ -93,7 +95,7 @@ describe("Tests for example1-lottery", async () => {
 
     const [submission2, bump] = await anchor.web3.PublicKey.findProgramAddress(
       [buf1, lottery.publicKey.toBytes()],
-      program.programId
+      program.programId,
     );
 
     // Get lottery ticket
@@ -110,10 +112,10 @@ describe("Tests for example1-lottery", async () => {
 
     // Get ending balances for player and lottery
     let endBalanacePlayer: number = await provider.connection.getBalance(
-      player1.publicKey
+      player1.publicKey,
     );
     let endBalanceLottery: number = await provider.connection.getBalance(
-      lottery.publicKey
+      lottery.publicKey,
     );
 
     // Assert lottery lamport balance is higher
@@ -129,17 +131,17 @@ describe("Tests for example1-lottery", async () => {
     // Assert submitters key matches the one provided
     let submissionState = await program.account.ticket.fetch(submission2);
     expect(submissionState.submitter.toString()).to.equal(
-      player1.publicKey.toString()
+      player1.publicKey.toString(),
     );
   });
 
   it("Submits a bid as player2", async () => {
     // Get starting balances for player and lottery account
     let startBalancePlayer: number = await provider.connection.getBalance(
-      player2.publicKey
+      player2.publicKey,
     );
     let startBalanceLottery: number = await provider.connection.getBalance(
-      lottery.publicKey
+      lottery.publicKey,
     );
 
     // Get lottery index
@@ -151,7 +153,7 @@ describe("Tests for example1-lottery", async () => {
 
     const [ticket, bump] = await anchor.web3.PublicKey.findProgramAddress(
       [buf1, lottery.publicKey.toBytes()],
-      program.programId
+      program.programId,
     );
 
     // Get lottery ticket
@@ -168,10 +170,10 @@ describe("Tests for example1-lottery", async () => {
 
     // Get ending balances for player and lottery
     let endBalanacePlayer = await provider.connection.getBalance(
-      player2.publicKey
+      player2.publicKey,
     );
     let endBalanceLottery: number = await provider.connection.getBalance(
-      lottery.publicKey
+      lottery.publicKey,
     );
 
     // Assert player lamport balance is lower
@@ -189,7 +191,7 @@ describe("Tests for example1-lottery", async () => {
     // Assert submitters key matches the one provided
     let submissionState = await program.account.ticket.fetch(ticket);
     expect(submissionState.submitter.toString()).to.equal(
-      player2.publicKey.toString()
+      player2.publicKey.toString(),
     );
   });
 
@@ -204,7 +206,7 @@ describe("Tests for example1-lottery", async () => {
 
       const [ticket, bump] = await anchor.web3.PublicKey.findProgramAddress(
         [buf1, lottery.publicKey.toBytes()],
-        program.programId
+        program.programId,
       );
 
       // Get lottery ticket
@@ -249,13 +251,17 @@ describe("Tests for example1-lottery", async () => {
   it("Winner withdraws funds", async () => {
     // Get winners starting balance
     let startBalance: number = await provider.connection.getBalance(
-      player2.publicKey
+      player2.publicKey,
     );
 
+    console.log("startBalance", startBalance);
+
     // Get winner idx
-    let winnerIdx: number = (
+    let { winnerIndex: winnerIdx, ticketPrice } = (
       await program.account.lottery.fetch(lottery.publicKey)
-    ).winnerIndex;
+    );
+
+    console.log('ticketPrice', ticketPrice.toNumber());
 
     const buf1 = Buffer.alloc(4);
     buf1.writeUIntBE(winnerIdx, 0, 4);
@@ -263,8 +269,17 @@ describe("Tests for example1-lottery", async () => {
     // Derive PDA of ticket
     const [ticket, bump] = await anchor.web3.PublicKey.findProgramAddress(
       [buf1, lottery.publicKey.toBytes()],
-      program.programId
+      program.programId,
     );
+
+    let lotteryBalance: number = await provider.connection.getBalance(
+      lottery.publicKey,
+    );
+
+    const lotteryPayout = Math.floor(lotteryBalance * 0.9);
+
+    console.log('lotteryBalance', lotteryBalance);
+    console.log('lotteryPayout', lotteryPayout);
 
     // Get lottery ticket
     await program.methods
@@ -280,5 +295,25 @@ describe("Tests for example1-lottery", async () => {
     // Assert winner got the payout
     let endBalanace = await provider.connection.getBalance(player2.publicKey);
     expect(endBalanace).to.be.greaterThan(startBalance);
+    expect(endBalanace).to.equal(startBalance + lotteryPayout);
+  });
+
+  it('Admin withdraws funds', async () => {
+    let adminStartBalance = await provider.connection.getBalance(lottery_admin.publicKey);
+    let lotteryStartBalance = await provider.connection.getBalance(lottery.publicKey);
+
+    await program.methods.withdrawFunds()
+      .accounts({
+        lottery: lottery.publicKey,
+        signer: lottery_admin.publicKey,
+      })
+      .signers([lottery_admin])
+      .rpc();
+
+    let adminEndBalance = await provider.connection.getBalance(lottery_admin.publicKey);
+    let lotteryEndBalance = await provider.connection.getBalance(lottery.publicKey);
+
+    expect(adminEndBalance).to.equal(adminStartBalance + lotteryStartBalance);
+    expect(lotteryEndBalance).to.equal(0);
   });
 });

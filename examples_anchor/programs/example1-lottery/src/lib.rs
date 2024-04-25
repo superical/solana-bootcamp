@@ -4,13 +4,14 @@ declare_id!("EnNAUhQEdDNtNszfguvK5RSkSLDStPLtUqeLpbjayoNq");
 
 #[program]
 mod example1 {
-    use super::*;       
+    use super::*;
 
     // Creates an account for the lottery
-    pub fn initialise_lottery(ctx: Context<Create>, ticket_price: u64, oracle_pubkey: Pubkey) -> Result<()> {        
-        let lottery: &mut Account<Lottery> = &mut ctx.accounts.lottery;        
-        lottery.authority = ctx.accounts.admin.key();                
-        lottery.count = 0;           
+    pub fn initialise_lottery(ctx: Context<Create>, ticket_price: u64, oracle_pubkey: Pubkey) -> Result<()> {
+        msg!("testttt");
+        let lottery: &mut Account<Lottery> = &mut ctx.accounts.lottery;
+        lottery.authority = ctx.accounts.admin.key();
+        lottery.count = 0;
         lottery.ticket_price = ticket_price;
         lottery.oracle = oracle_pubkey;
 
@@ -19,10 +20,10 @@ mod example1 {
 
     // Buy a lottery ticket
     pub fn buy_ticket(ctx: Context<Submit>) -> Result<()> {
-        
+
         // Deserialise lottery account
-        let lottery: &mut Account<Lottery> = &mut ctx.accounts.lottery;          
-        let player: &mut Signer = &mut ctx.accounts.player;                 
+        let lottery: &mut Account<Lottery> = &mut ctx.accounts.lottery;
+        let player: &mut Signer = &mut ctx.accounts.player;
 
         // Transfer lamports to the lottery account
         let ix = anchor_lang::solana_program::system_instruction::transfer(
@@ -39,47 +40,72 @@ mod example1 {
         )?;
 
         // Deserialise ticket account
-        let ticket: &mut Account<Ticket> = &mut ctx.accounts.ticket;                
+        let ticket: &mut Account<Ticket> = &mut ctx.accounts.ticket;
 
         // Set submitter field as the address pays for account creation
         ticket.submitter = ctx.accounts.player.key();
 
         // Set ticket index equal to the counter
-        ticket.idx = lottery.count;        
+        ticket.idx = lottery.count;
 
         // Increment total submissions counter
-        lottery.count += 1;                      
+        lottery.count += 1;
 
-        Ok(())  
+        Ok(())
     }
-    
+
     // Oracle picks winner index
     pub fn pick_winner(ctx: Context<Winner>, winner: u32) -> Result<()> {
 
         // Deserialise lottery account
         let lottery: &mut Account<Lottery> = &mut ctx.accounts.lottery;
-        
+
         // Set winning index
-        lottery.winner_index = winner;                
+        lottery.winner_index = winner;
 
         Ok(())
-    }    
+    }
 
     // Payout prize to the winner
     pub fn pay_out_winner(ctx: Context<Payout>) -> Result<()> {
 
         // Check if it matches the winner address
         let lottery: &mut Account<Lottery> = &mut ctx.accounts.lottery;
-        let recipient: &mut AccountInfo =  &mut ctx.accounts.winner;        
+        let recipient: &mut AccountInfo = &mut ctx.accounts.winner;
 
         // Get total money stored under original lottery account
-        let balance: u64 = lottery.to_account_info().lamports();                      
-            
+        let balance: u64 = lottery.to_account_info().lamports() * 90 / 100;
+
         **lottery.to_account_info().try_borrow_mut_lamports()? -= balance;
-        **recipient.to_account_info().try_borrow_mut_lamports()? += balance; 
-        
+        **recipient.to_account_info().try_borrow_mut_lamports()? += balance;
+
+        lottery.paid = true;
+
         Ok(())
     }
+
+    pub fn withdraw_funds(ctx: Context<Withdraw>) -> Result<()> {
+        let lottery = &ctx.accounts.lottery;
+
+        if lottery.winner_index == 0 {
+            // err!(ErrorCode::NoWinnerYet);
+            return Err(ErrorCode::NoWinnerYet.into());
+        }
+
+        let balance: u64 = lottery.to_account_info().lamports();
+        **lottery.to_account_info().try_borrow_mut_lamports()? -= balance;
+        **ctx.accounts.signer.to_account_info().try_borrow_mut_lamports()? += balance;
+
+        Ok(())
+    }
+}
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Signer not authorised")]
+    UnauthorizedAccess,
+    #[msg("A winner has not been picked yet")]
+    NoWinnerYet,
 }
 
 // Contexts
@@ -90,72 +116,81 @@ pub struct Create<'info> {
     #[account(init, payer = admin, space = 8 + 180)]
     pub lottery: Account<'info, Lottery>,
     #[account(mut)]
-    pub admin: Signer<'info>,    
+    pub admin: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct Submit<'info> {            
-    #[account(init, 
-        seeds = [
-            &lottery.count.to_be_bytes(), 
-            lottery.key().as_ref()
-        ], 
-        constraint = player.to_account_info().lamports() >= lottery.ticket_price,
-        bump, 
-        payer = player, 
-        space=80
+pub struct Submit<'info> {
+    #[account(init,
+    seeds = [
+    & lottery.count.to_be_bytes(),
+    lottery.key().as_ref()
+    ],
+    constraint = player.to_account_info().lamports() >= lottery.ticket_price,
+    bump,
+    payer = player,
+    space = 80
     )]
-    pub ticket: Account<'info, Ticket>,        
-    #[account(mut)]                                 
-    pub player: Signer<'info>,                     // Payer for account creation    
-    #[account(mut)]       
-    pub lottery: Account<'info, Lottery>,          // To retrieve and increment counter        
-    pub system_program: Program<'info, System>,    
+    pub ticket: Account<'info, Ticket>,
+    #[account(mut)]
+    pub player: Signer<'info>,                     // Payer for account creation
+    #[account(mut)]
+    pub lottery: Account<'info, Lottery>,          // To retrieve and increment counter
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct Winner<'info> {    
-    #[account(mut, constraint = lottery.oracle == *oracle.key)]
-    pub lottery: Account<'info, Lottery>,        
+pub struct Winner<'info> {
+    #[account(mut, constraint = lottery.oracle == * oracle.key)]
+    pub lottery: Account<'info, Lottery>,
     pub oracle: Signer<'info>,
 }
 
 #[derive(Accounts)]
-pub struct Payout<'info> {             
-    #[account(mut, 
-        constraint = 
-        ticket.submitter == *winner.key && 
-        ticket.idx == lottery.winner_index        
-    )]       
+pub struct Payout<'info> {
+    #[account(mut,
+    constraint =
+    ticket.submitter == * winner.key &&
+    ticket.idx == lottery.winner_index
+    )]
     pub lottery: Account<'info, Lottery>,          // To assert winner and withdraw lamports
-    #[account(mut)]       
+    #[account(mut)]
     /// CHECK: Not dangerous as it only receives lamports
     pub winner: AccountInfo<'info>,                // Winner account
-    #[account(mut)]                  
+    #[account(mut)]
     pub ticket: Account<'info, Ticket>,            // Winning PDA
+}
+
+#[derive(Accounts)]
+pub struct Withdraw<'info> {
+    #[account(mut, constraint=lottery.paid == true)]
+    pub lottery: Account<'info, Lottery>,
+    #[account(mut, constraint = signer.key() == lottery.authority)]
+    pub signer: Signer<'info>,
 }
 
 
 // Accounts
 ////////////////////////////////////////////////////////////////
 
-// Lottery account 
+// Lottery account
 #[account]
-pub struct Lottery {    
-    pub authority: Pubkey, 
-    pub oracle: Pubkey, 
+pub struct Lottery {
+    pub authority: Pubkey,
+    pub oracle: Pubkey,
     pub winner: Pubkey,
-    pub winner_index: u32, 
+    pub winner_index: u32,
     pub count: u32,
     pub ticket_price: u64,
+    pub paid: bool,
 }
 
 // Ticket PDA
 #[account]
-#[derive(Default)] 
-pub struct Ticket {    
-    pub submitter: Pubkey,    
+#[derive(Default)]
+pub struct Ticket {
+    pub submitter: Pubkey,
     pub idx: u32,
 }
 
