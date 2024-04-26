@@ -60,6 +60,8 @@ pub enum Hand {
     Rock,
     Paper,
     Scissors,
+    Lizard,
+    Spock,
 }
 
 impl Hand {
@@ -68,6 +70,8 @@ impl Hand {
             '0' => Ok(Hand::Rock),
             '1' => Ok(Hand::Paper),
             '2' => Ok(Hand::Scissors),
+            '3' => Ok(Hand::Lizard),
+            '4' => Ok(Hand::Spock),
             _ => Err(SErrors::WrongHandChar.into()),
         }
     }
@@ -80,15 +84,17 @@ impl Default for Hand {
 }
 
 pub trait Beats {
-    fn beats(&self) -> Self;
+    fn beats(&self) -> [Hand; 2];
 }
 
 impl Beats for Hand {
-    fn beats(&self) -> Self {
+    fn beats(&self) -> [Hand; 2] {
         match *self {
-            Rock => Scissors,
-            Paper => Rock,
-            Scissors => Paper,
+            Rock => [Scissors, Lizard],
+            Paper => [Rock, Spock],
+            Scissors => [Paper, Lizard],
+            Lizard => [Paper, Spock],
+            Spock => [Rock, Scissors]
         }
     }
 }
@@ -158,8 +164,8 @@ impl Game {
         msg!("player2 hand: {:?}", self.hand[1]);
 
         match (player1, player2) {
-            _ if player1 == self.hand[1] => Win,
-            _ if player2 == self.hand[0] => Lose,
+            _ if player1.contains(&self.hand[1]) => Win,
+            _ if player2.contains(&self.hand[0]) => Lose,
             _ => Draw,
         }
     }

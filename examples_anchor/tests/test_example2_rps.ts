@@ -292,4 +292,156 @@ describe.only("Tests for example2-rps", async () => {
     // Check hand submitted for player 2
     expect(gameState.winner).to.equal("DRAW");
   });
+
+  it("Player1: Lizard, Player 2: Spock", async () => {
+    const game = anchor.web3.Keypair.generate();
+
+    // Hands with salt
+    const handStringPlayer1 = "3 HuHASUhDil"; // player 1 has paper
+    const handStringPlayer2 = "4 ehehehe"; // player 2 has scissors
+    let hashedhandStringPlayer1: number[] = sha256.digest(handStringPlayer1);
+    let hashedhandStringPlayer2: number[] = sha256.digest(handStringPlayer2);
+
+    // Airdrop test accounts
+    await provider.connection.confirmTransaction(
+      await provider.connection.requestAirdrop(
+        player1.publicKey,
+        2 * LAMPORTS_PER_SOL
+      )
+    );
+    await provider.connection.confirmTransaction(
+      await provider.connection.requestAirdrop(
+        player2.publicKey,
+        2 * LAMPORTS_PER_SOL
+      )
+    );
+
+    await program.methods
+      .newGame(player2.publicKey)
+      .accounts({
+        game: game.publicKey,
+        player1: player1.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([game, player1])
+      .rpc();
+
+    await program.methods
+      .placeHash(hashedhandStringPlayer1)
+      .accounts({
+        game: game.publicKey,
+        player: player1.publicKey,
+      })
+      .signers([player1])
+      .rpc();
+
+    await program.methods
+      .placeHash(hashedhandStringPlayer2)
+      .accounts({
+        game: game.publicKey,
+        player: player2.publicKey,
+      })
+      .signers([player2])
+      .rpc();
+
+    await program.methods
+      .placeHand(handStringPlayer1)
+      .accounts({
+        game: game.publicKey,
+        player: player1.publicKey,
+      })
+      .signers([player1])
+      .rpc();
+
+    await program.methods
+      .placeHand(handStringPlayer2)
+      .accounts({
+        game: game.publicKey,
+        player: player2.publicKey,
+      })
+      .signers([player2])
+      .rpc();
+
+    // Get game account state
+    let gameState = await program.account.game.fetch(game.publicKey);
+
+    // Check hand submitted for player 1
+    expect(gameState.winner).to.equal(player1.publicKey.toString());
+  });
+
+  it("Player1: Spock, Player 2: Paper", async () => {
+    const game = anchor.web3.Keypair.generate();
+
+    // Hands with salt
+    const handStringPlayer1 = "4 HuHASUhDil"; // player 1 has paper
+    const handStringPlayer2 = "1 ehehehe"; // player 2 has scissors
+    let hashedhandStringPlayer1: number[] = sha256.digest(handStringPlayer1);
+    let hashedhandStringPlayer2: number[] = sha256.digest(handStringPlayer2);
+
+    // Airdrop test accounts
+    await provider.connection.confirmTransaction(
+      await provider.connection.requestAirdrop(
+        player1.publicKey,
+        2 * LAMPORTS_PER_SOL
+      )
+    );
+    await provider.connection.confirmTransaction(
+      await provider.connection.requestAirdrop(
+        player2.publicKey,
+        2 * LAMPORTS_PER_SOL
+      )
+    );
+
+    await program.methods
+      .newGame(player2.publicKey)
+      .accounts({
+        game: game.publicKey,
+        player1: player1.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([game, player1])
+      .rpc();
+
+    await program.methods
+      .placeHash(hashedhandStringPlayer1)
+      .accounts({
+        game: game.publicKey,
+        player: player1.publicKey,
+      })
+      .signers([player1])
+      .rpc();
+
+    await program.methods
+      .placeHash(hashedhandStringPlayer2)
+      .accounts({
+        game: game.publicKey,
+        player: player2.publicKey,
+      })
+      .signers([player2])
+      .rpc();
+
+    await program.methods
+      .placeHand(handStringPlayer1)
+      .accounts({
+        game: game.publicKey,
+        player: player1.publicKey,
+      })
+      .signers([player1])
+      .rpc();
+
+    await program.methods
+      .placeHand(handStringPlayer2)
+      .accounts({
+        game: game.publicKey,
+        player: player2.publicKey,
+      })
+      .signers([player2])
+      .rpc();
+
+    // Get game account state
+    let gameState = await program.account.game.fetch(game.publicKey);
+
+    // Check hand submitted for player 2
+    expect(gameState.winner).to.equal(player2.publicKey.toString());
+  });
 });
