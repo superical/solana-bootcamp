@@ -48,7 +48,7 @@ pub struct PlaceHash<'info> {
 
 #[derive(Accounts)]
 pub struct NewGame<'info> {
-    #[account(init,  payer = player1, space = 64 +  Game::MAXIMUM_SIZE)]
+    #[account(init, payer = player1, space = 64 + Game::MAXIMUM_SIZE)]
     pub game: Account<'info, Game>,
     #[account(mut)]
     pub player1: Signer<'info>,
@@ -129,12 +129,25 @@ impl Game {
     }
 
     pub fn get_player_index(&mut self, player: Pubkey) -> Result<usize> {
-        let index_player: usize = self.players.iter().position(|&x| x == player).unwrap();
+        // This original code will panic instead of return the MissingPlayer error when the input player is not found
+        // let index_player: usize = self.players.iter().position(|&x| x == player).unwrap();
+
+        // match index_player {
+        //     0 => Ok(index_player),
+        //     1 => Ok(index_player),
+        //     _ => Err(SErrors::MissingPlayer.into()),
+        // }
+
+        // This modified code handles an invalid player to return the MissingPlayer error
+        let index_player: Result<usize> = self.players.iter().position(|&x| x == player).ok_or(Error::from(SErrors::MissingPlayer));
 
         match index_player {
-            0 => Ok(index_player),
-            1 => Ok(index_player),
-            _ => Err(SErrors::MissingPlayer.into()),
+            Ok(index) => match index {
+                0 => Ok(index),
+                1 => Ok(index),
+                _ => Err(SErrors::MissingPlayer.into()),
+            },
+            Err(_e) => Err(SErrors::MissingPlayer.into()),
         }
     }
 

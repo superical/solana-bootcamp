@@ -6,7 +6,7 @@ import { Example2 } from "../target/types/example2";
 const { SystemProgram } = anchor.web3;
 import { sha256 } from "js-sha256";
 
-describe("Tests for example2-rps", async () => {
+describe.only("Tests for example2-rps", async () => {
   // Get handles
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
