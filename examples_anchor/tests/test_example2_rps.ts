@@ -6,7 +6,7 @@ import { Example2 } from "../target/types/example2";
 const { SystemProgram } = anchor.web3;
 import { sha256 } from "js-sha256";
 
-describe.only("Tests for example2-rps", async () => {
+describe("Tests for example2-rps", async () => {
   // Get handles
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -45,7 +45,7 @@ describe.only("Tests for example2-rps", async () => {
   it("Creates a new game", async () => {
     // Create a new game
     await program.methods
-      .newGame(player2.publicKey)
+      .newGame(player2.publicKey, new anchor.BN(15 * 60))
       .accounts({
         game: game.publicKey,
         player1: player1.publicKey,
@@ -178,7 +178,7 @@ describe.only("Tests for example2-rps", async () => {
     );
 
     await program.methods
-      .newGame(player2.publicKey)
+      .newGame(player2.publicKey, new anchor.BN(15 * 60))
       .accounts({
         game: game.publicKey,
         player1: player1.publicKey,
@@ -241,7 +241,7 @@ describe.only("Tests for example2-rps", async () => {
 
     // Create a new game
     await program.methods
-      .newGame(player2.publicKey)
+      .newGame(player2.publicKey, new anchor.BN(15 * 60))
       .accounts({
         game: game.publicKey,
         player1: player1.publicKey,
@@ -317,7 +317,7 @@ describe.only("Tests for example2-rps", async () => {
     );
 
     await program.methods
-      .newGame(player2.publicKey)
+      .newGame(player2.publicKey, new anchor.BN(15 * 60))
       .accounts({
         game: game.publicKey,
         player1: player1.publicKey,
@@ -393,7 +393,7 @@ describe.only("Tests for example2-rps", async () => {
     );
 
     await program.methods
-      .newGame(player2.publicKey)
+      .newGame(player2.publicKey, new anchor.BN(15 * 60))
       .accounts({
         game: game.publicKey,
         player1: player1.publicKey,
@@ -443,5 +443,144 @@ describe.only("Tests for example2-rps", async () => {
 
     // Check hand submitted for player 2
     expect(gameState.winner).to.equal(player2.publicKey.toString());
+  });
+
+  describe('Forfeit players exceeded deadline to place hand', () => {
+    let game: anchor.web3.Keypair;
+    let handStringPlayer1: string;
+    let handStringPlayer2: string;
+
+    beforeEach(async () => {
+      game = anchor.web3.Keypair.generate();
+
+      // Hands with salt
+      handStringPlayer1 = "4 HuHASUhDil"; // player 1 has paper
+      handStringPlayer2 = "1 ehehehe"; // player 2 has scissors
+      let hashedhandStringPlayer1: number[] = sha256.digest(handStringPlayer1);
+      let hashedhandStringPlayer2: number[] = sha256.digest(handStringPlayer2);
+
+      // Airdrop test accounts
+      await provider.connection.confirmTransaction(
+        await provider.connection.requestAirdrop(
+          player1.publicKey,
+          2 * LAMPORTS_PER_SOL
+        )
+      );
+      await provider.connection.confirmTransaction(
+        await provider.connection.requestAirdrop(
+          player2.publicKey,
+          2 * LAMPORTS_PER_SOL
+        )
+      );
+
+      await program.methods
+        .newGame(player2.publicKey, new anchor.BN(1)) // 1 second deadline for testing
+        .accounts({
+          game: game.publicKey,
+          player1: player1.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([game, player1])
+        .rpc();
+
+      await program.methods
+        .placeHash(hashedhandStringPlayer1)
+        .accounts({
+          game: game.publicKey,
+          player: player1.publicKey,
+        })
+        .signers([player1])
+        .rpc();
+
+
+      await program.methods
+        .placeHash(hashedhandStringPlayer2)
+        .accounts({
+          game: game.publicKey,
+          player: player2.publicKey,
+        })
+        .signers([player2])
+        .rpc();
+    })
+
+    it("Make player1 winner when player2 exceeds deadline to place hand", async () => {
+      await program.methods
+        .placeHand(handStringPlayer1)
+        .accounts({
+          game: game.publicKey,
+          player: player1.publicKey,
+        })
+        .signers([player1])
+        .rpc();
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      await program.methods
+        .forfeit()
+        .accounts({
+          game: game.publicKey,
+          player: player1.publicKey,
+        })
+        .signers([player1])
+        .rpc()
+
+      // Get game account state
+      let gameState = await program.account.game.fetch(game.publicKey);
+
+      // Check hand submitted for player 1
+      expect(gameState.winner).to.equal(player1.publicKey.toString());
+    });
+
+    it("Player1 cannot forfeit when player2 has not exceeded deadline to place hand", async () => {
+      await program.methods
+        .placeHand(handStringPlayer1)
+        .accounts({
+          game: game.publicKey,
+          player: player1.publicKey,
+        })
+        .signers([player1])
+        .rpc();
+
+      try {
+        // Player1 attempts to forfeit Player2 before deadline
+        await program.methods
+          .forfeit()
+          .accounts({
+            game: game.publicKey,
+            player: player1.publicKey,
+          })
+          .signers([player1])
+          .rpc()
+      } catch (e: unknown) {
+        expect((e as anchor.AnchorError).message).to.contain('ForfeitDeadlineNotReached');
+      }
+    });
+
+    it("Player exceeded deadline cannot forfeit themselves", async () => {
+      await program.methods
+        .placeHand(handStringPlayer1)
+        .accounts({
+          game: game.publicKey,
+          player: player1.publicKey,
+        })
+        .signers([player1])
+        .rpc();
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      try {
+      // Player2 hasn't placed hand but attempts to forfeit themselves
+      await program.methods
+        .forfeit()
+        .accounts({
+          game: game.publicKey,
+          player: player2.publicKey,
+        })
+        .signers([player2])
+        .rpc()
+        } catch (e: unknown) {
+          expect((e as anchor.AnchorError).message).to.contain('InvalidForfeiture');
+        }
+    });
   });
 });

@@ -12,10 +12,10 @@ mod example2 {
     use super::*;
 
     // Creates an account for the game
-    pub fn new_game(ctx: Context<NewGame>, player_two: Pubkey) -> Result<()> {
+    pub fn new_game(ctx: Context<NewGame>, player_two: Pubkey, wait_for: u64) -> Result<()> {
         ctx.accounts
             .game
-            .new([ctx.accounts.player1.key(), player_two])
+            .new([ctx.accounts.player1.key(), player_two], wait_for)
     }
 
     // Load the hash to the game account for upcoming hand
@@ -36,6 +36,12 @@ mod example2 {
         let indx: usize = game.get_player_index(ctx.accounts.player.key()).unwrap();
 
         game.place_hand(hand_string, indx)
+    }
+
+    pub fn forfeit(ctx: Context<PlaceHash>) -> Result<()> {
+        let game: &mut Account<Game> = &mut ctx.accounts.game;
+
+        game.forfeit(ctx.accounts.player.key())
     }
 }
 
@@ -117,19 +123,22 @@ pub struct Game {
     hand: [Hand; 2],
     hand_submitted: [bool; 2],
     winner: String,
+    deadline: u64,
+    submission_wait_time: u64,
 }
 
 impl Game {
     // Based on account varfiable sizes
-    pub const MAXIMUM_SIZE: usize = (32 * 2) + (32 * 2) + 3 * 2;
+    pub const MAXIMUM_SIZE: usize = (32 * 2) + (32 * 2) + 3 * 2 + 32 + 8 + 8;
 
     // Player that pays for account set up calls this with both pubkeys
-    fn new(&mut self, players: [Pubkey; 2]) -> Result<()> {
+    fn new(&mut self, players: [Pubkey; 2], wait_for: u64) -> Result<()> {
         self.hash_submitted = [false, false];
         self.hand_submitted = [false, false];
         self.players = players;
         self.hand = [Hand::Rock, Hand::Rock];
         self.hashed_hand = [[0; 32], [0; 32]];
+        self.submission_wait_time = wait_for;
 
         Ok(())
     }
@@ -207,12 +216,31 @@ impl Game {
                     Lose => self.winner = self.players[1].to_string(),
                     Draw => self.winner = "DRAW".to_string(),
                 }
+            } else {
+                let clock = Clock::get()?;
+                self.deadline = clock.unix_timestamp as u64 + self.submission_wait_time;
             }
 
             return Ok(());
         }
 
         return Err(SErrors::WrongHash.into());
+    }
+
+    pub fn forfeit(&mut self, forfeitor: Pubkey) -> Result<()> {
+        let clock = Clock::get()?;
+        if self.deadline == 0 || self.deadline > clock.unix_timestamp as u64 {
+            return Err(SErrors::ForfeitDeadlineNotReached.into());
+        }
+
+        let indx: usize = self.get_player_index(forfeitor)?;
+        if self.hand_submitted[indx] == true && self.hand_submitted[1 - indx] == false {
+            self.winner = self.players[indx].to_string();
+        } else {
+            return Err(SErrors::InvalidForfeiture.into());
+        }
+
+        Ok(())
     }
 }
 
@@ -224,4 +252,6 @@ pub enum SErrors {
     MissingPlayer,
     WrongHandChar,
     WrongHash,
+    ForfeitDeadlineNotReached,
+    InvalidForfeiture,
 }
